@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -44,8 +45,7 @@ func main() {
 		env = flag.Arg(0)
 	}
 
-	portNumbers := conf.LoadYamlConfig(filename, env)
-
+	config := conf.LoadYamlConfig(filename, env)
 	if app.CurrentEnvironment.LogToFile {
 		filename := app.CurrentEnvironment.LogFile
 		file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -61,20 +61,25 @@ func main() {
 	quit := make(chan struct{}, 0)
 	go gosqs.PeriodicTasks(1*time.Second, quit)
 
-	if len(portNumbers) == 1 {
-		log.Warnf("GoAws listening on: 0.0.0.0:%s", portNumbers[0])
-		err := http.ListenAndServe("0.0.0.0:"+portNumbers[0], r)
-		log.Fatal(err)
-	} else if len(portNumbers) == 2 {
+	addresses := config.GetListenAddresses()
+	if len(addresses) == 1 {
+		start(addresses[0], r)
+	} else if len(addresses) == 2 {
 		go func() {
-			log.Warnf("GoAws listening on: 0.0.0.0:%s", portNumbers[0])
-			err := http.ListenAndServe("0.0.0.0:"+portNumbers[0], r)
-			log.Fatal(err)
+			start(addresses[0], r)
 		}()
-		log.Warnf("GoAws listening on: 0.0.0.0:%s", portNumbers[1])
-		err := http.ListenAndServe("0.0.0.0:"+portNumbers[1], r)
-		log.Fatal(err)
+		start(addresses[1], r)
 	} else {
 		log.Fatal("Not enough or too many ports defined to start GoAws.")
 	}
+}
+
+func start(address app.ListenAddress, handler http.Handler) {
+	l, err := net.Listen(address.Network, address.Address)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Warnf("GoAws listening on: %s", address.String())
+	err = http.Serve(l, handler)
+	log.Fatal(err)
 }

@@ -19,8 +19,8 @@ import (
 
 var envs map[string]app.Environment
 
-func LoadYamlConfig(filename string, env string) []string {
-	ports := []string{"4100"}
+func LoadYamlConfig(filename string, env string) app.Environment {
+	defaultConfig := app.Environment{Port: "4100"}
 
 	if filename == "" {
 		root, _ := filepath.Abs(".")
@@ -32,19 +32,19 @@ func LoadYamlConfig(filename string, env string) []string {
 		})
 		if err != nil || filename == "" {
 			log.Warn("Failure to find default config file")
-			return ports
+			return defaultConfig
 		}
 	}
 	log.Infof("Loading config file: %s", filename)
 	yamlFile, err := os.ReadFile(filename)
 	if err != nil {
-		return ports
+		return defaultConfig
 	}
 
 	err = yaml.Unmarshal(yamlFile, &envs)
 	if err != nil {
 		log.Errorf("err: %v\n", err)
-		return ports
+		return defaultConfig
 	}
 	if env == "" {
 		env = "Local"
@@ -56,10 +56,7 @@ func LoadYamlConfig(filename string, env string) []string {
 
 	app.CurrentEnvironment = envs[env]
 
-	if envs[env].Port != "" {
-		ports = []string{envs[env].Port}
-	} else if envs[env].SqsPort != "" && envs[env].SnsPort != "" {
-		ports = []string{envs[env].SqsPort, envs[env].SnsPort}
+	if envs[env].Port == "" && envs[env].SqsPort != "" && envs[env].SnsPort != "" {
 		app.CurrentEnvironment.Port = envs[env].SqsPort
 	}
 
@@ -133,7 +130,7 @@ func LoadYamlConfig(filename string, env string) []string {
 			err := setQueueRedrivePolicy(app.SyncQueues.Queues, q, queue.RedrivePolicy)
 			if err != nil {
 				log.Errorf("err: %s", err)
-				return ports
+				return defaultConfig
 			}
 		}
 
@@ -158,7 +155,7 @@ func LoadYamlConfig(filename string, env string) []string {
 				err = json.Unmarshal([]byte(subs.FilterPolicy), filterPolicy)
 				if err != nil {
 					log.Errorf("err: %s", err)
-					return ports
+					return defaultConfig
 				}
 				newSub.FilterPolicy = filterPolicy
 			}
@@ -171,7 +168,7 @@ func LoadYamlConfig(filename string, env string) []string {
 	app.SyncQueues.Unlock()
 	app.SyncTopics.Unlock()
 
-	return ports
+	return envs[env]
 }
 
 func createHttpSubscription(configSubscription app.EnvSubsciption) *app.Subscription {

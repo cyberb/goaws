@@ -1,5 +1,10 @@
 package app
 
+import (
+	"fmt"
+	"strings"
+)
+
 /*** config ***/
 type EnvSubsciption struct {
 	Protocol     string
@@ -29,6 +34,15 @@ type EnvQueueAttributes struct {
 	MaximumMessageSize            int
 }
 
+type ListenAddress struct {
+	Network string
+	Address string
+}
+
+func (a ListenAddress) String() string {
+	return fmt.Sprintf("%s://%s", a.Network, a.Address)
+}
+
 type Environment struct {
 	Host                   string
 	Port                   string
@@ -43,6 +57,27 @@ type Environment struct {
 	Queues                 []EnvQueue
 	QueueAttributeDefaults EnvQueueAttributes
 	RandomLatency          RandomLatency
+}
+
+func (e Environment) GetListenAddresses() []ListenAddress {
+	if strings.HasPrefix(e.Host, "/") {
+		return []ListenAddress{{Network: "unix", Address: e.Host}}
+	}
+	var addresses []ListenAddress
+	for _, port := range e.GetPorts() {
+		addresses = append(addresses, ListenAddress{Network: "tcp", Address: fmt.Sprintf("0.0.0.0:%s", port)})
+	}
+	return addresses
+}
+
+func (e Environment) GetPorts() []string {
+	if e.Port != "" {
+		return []string{e.Port}
+	}
+	if e.SqsPort != "" && e.SnsPort != "" {
+		return []string{e.SqsPort, e.SnsPort}
+	}
+	return []string{}
 }
 
 var CurrentEnvironment Environment
