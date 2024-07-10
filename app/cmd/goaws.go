@@ -75,6 +75,12 @@ func main() {
 }
 
 func start(address app.ListenAddress, handler http.Handler) {
+	if address.IsUnixSocket() {
+		err := os.RemoveAll(address.Address)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 	l, err := net.Listen(address.Network, address.Address)
 	if err != nil {
 		log.Fatal(err)

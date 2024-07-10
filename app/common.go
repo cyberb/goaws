@@ -39,6 +39,10 @@ type ListenAddress struct {
 	Address string
 }
 
+func (a ListenAddress) IsUnixSocket() bool {
+	return a.Network == "unix"
+}
+
 func (a ListenAddress) String() string {
 	return fmt.Sprintf("%s://%s", a.Network, a.Address)
 }
